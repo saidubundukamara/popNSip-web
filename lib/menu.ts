@@ -159,3 +159,71 @@ export async function uploadItemImage(itemId: string, file: File): Promise<MenuI
 
   return (body as { item: MenuItem }).item;
 }
+
+// ─── ordering ─────────────────────────────────────────────────────────────
+
+export type OrderType = "DELIVERY" | "PICKUP" | "DINE_IN";
+export type PaymentMethod = "MOBILE_MONEY" | "CASH";
+
+export type PublicSettings = {
+  branch: { id: string; name: string; address: string; phoneE164: string; currency: string; timezone: string };
+  isOpen: boolean;
+  orderTypes: { delivery: boolean; pickup: boolean; dineIn: boolean };
+};
+
+export type PlacedOrder = {
+  id: string;
+  reference: string;
+  status: string;
+  totalMinor: number;
+  currency: string;
+  trackingToken: string;
+};
+
+export type CreateOrderBody = {
+  type: OrderType;
+  paymentMethod: PaymentMethod;
+  lines: { menuItemId: string; variantId?: string; modifierIds: string[]; quantity: number; notes?: string }[];
+  customer: { name: string; phone: string };
+  deliveryAddress?: string;
+  deliveryNotes?: string;
+  tableCode?: string;
+};
+
+/**
+ * The idempotency key is generated once per checkout attempt and reused across
+ * retries, so a dropped connection cannot produce a second order (FR-SHOP-10).
+ */
+export const placeOrder = (body: CreateOrderBody, idempotencyKey: string) =>
+  apiFetch<{ order: PlacedOrder; replayed: boolean }>("/api/orders", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(body),
+  });
+
+export type TrackedOrder = {
+  order: {
+    reference: string;
+    status: string;
+    type: string;
+    placedAt: string;
+    subtotalMinor: number;
+    adjustmentsMinor: number;
+    totalMinor: number;
+    currency: string;
+    deliveryAddress: string | null;
+    items: {
+      name: string;
+      variantName: string | null;
+      quantity: number;
+      lineTotalMinor: number;
+      notes: string | null;
+      modifiers: { name: string; priceMinor: number }[];
+    }[];
+  };
+  settledMinor: number;
+  balanceDueMinor: number;
+  events: { toStatus: string; createdAt: string }[];
+};
+
+export const fetchTrackedOrder = (token: string) => apiFetch<TrackedOrder>(`/api/orders/track/${token}`);
