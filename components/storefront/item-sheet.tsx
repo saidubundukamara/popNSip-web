@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { toCartLine, useCart } from "@/lib/cart-store";
+import { toCartLine, useCart, type CartLine } from "@/lib/cart-store";
 import { formatDelta, formatMinor, imageUrl } from "@/lib/format";
 import type { MenuItem, ModifierGroup } from "@/lib/menu";
 
@@ -22,10 +22,17 @@ export function ItemSheet({
   item,
   currency,
   onOpenChange,
+  onAdd,
 }: {
   item: MenuItem;
   currency: string;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Where the configured line goes. Omitted on the storefront, where it joins
+   * the customer's persisted cart; supplied by the POS, which keeps its own
+   * in-memory order and must not touch a customer's cart.
+   */
+  onAdd?: (line: Omit<CartLine, "key">) => void;
 }) {
   // The parent keys this component by item id, so a different item remounts
   // with fresh state — no reset effect, and no chance of a stale selection
@@ -224,7 +231,9 @@ export function ItemSheet({
               disabled={!canAdd}
               className="flex-1"
               onClick={() => {
-                add(toCartLine(item, variantId, chosen, quantity, notes.trim() || null));
+                const line = toCartLine(item, variantId, chosen, quantity, notes.trim() || null);
+                if (onAdd) onAdd(line);
+                else add(line);
                 onOpenChange(false);
               }}
             >

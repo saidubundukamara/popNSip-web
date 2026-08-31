@@ -26,12 +26,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </Link>
 
             <nav className="flex items-center gap-1">
-              <Link
-                href="/dashboard/menu"
-                className="hover:bg-muted rounded-md px-3 py-1.5 text-sm font-medium"
-              >
-                Menu
-              </Link>
+              {[
+                { href: "/dashboard/queue", label: "Queue" },
+                { href: "/dashboard/pos", label: "POS" },
+                { href: "/dashboard/menu", label: "Menu" },
+              ].map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="hover:bg-muted rounded-md px-3 py-1.5 text-sm font-medium"
+                >
+                  {link.label}
+                </Link>
+              ))}
             </nav>
           </div>
 
