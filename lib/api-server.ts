@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import { API_BASE_URL, type SessionUser } from "@/lib/api-client";
+import type { Category } from "@/lib/menu";
 
 /**
  * Server-component API access. `credentials: 'include'` means nothing on the
@@ -24,4 +25,10 @@ async function serverApiFetch<T>(path: string): Promise<T | null> {
 export async function getSessionUser(): Promise<SessionUser | null> {
   const body = await serverApiFetch<{ user: SessionUser }>("/api/auth/me");
   return body?.user ?? null;
+}
+
+/** The manager's menu, fetched on the server so the page arrives populated. */
+export async function getManagedMenu(): Promise<Category[]> {
+  const body = await serverApiFetch<{ categories: Category[] }>("/api/staff/menu");
+  return body?.categories ?? [];
 }
