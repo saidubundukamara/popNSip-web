@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 
 import { API_BASE_URL, type SessionUser } from "@/lib/api-client";
-import type { Category, StaffOrder } from "@/lib/menu";
+import type { AnalyticsOverview, Category, StaffOrder } from "@/lib/menu";
 
 /**
  * Server-component API access. `credentials: 'include'` means nothing on the
@@ -37,4 +37,9 @@ export async function getManagedMenu(): Promise<Category[]> {
 export async function getQueue(): Promise<StaffOrder[]> {
   const body = await serverApiFetch<{ orders: StaffOrder[] }>("/api/staff/orders");
   return body?.orders ?? [];
+}
+
+/** The dashboard's opening numbers, fetched server-side. */
+export async function getAnalytics(): Promise<AnalyticsOverview | null> {
+  return serverApiFetch<AnalyticsOverview>("/api/staff/analytics/overview?period=today");
 }

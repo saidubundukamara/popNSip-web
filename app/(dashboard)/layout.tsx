@@ -30,6 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 { href: "/dashboard/queue", label: "Queue" },
                 { href: "/dashboard/pos", label: "POS" },
                 { href: "/dashboard/menu", label: "Menu" },
+                { href: "/dashboard/analytics", label: "Analytics" },
               ].map((link) => (
                 <Link
                   key={link.href}

@@ -359,3 +359,35 @@ export const startPayment = (token: string) =>
     `/api/orders/track/${token}/pay`,
     { method: "POST" },
   );
+
+// ─── analytics ────────────────────────────────────────────────────────────
+
+export type AnalyticsPeriod = "today" | "7d" | "30d" | "custom";
+
+export type DateRange = { fromLocalDate: string; toLocalDateExclusive: string; timezone: string };
+
+export type AnalyticsOverview = {
+  summary: {
+    revenueMinor: number;
+    orderCount: number;
+    /** Null when there were no orders — shown as an em dash, never a zero. */
+    averageOrderValueMinor: number | null;
+    range: DateRange;
+  };
+  topItems: { menuItemId: string; name: string; quantity: number; revenueMinor: number }[];
+  hours: { hour: number; orderCount: number; revenueMinor: number }[];
+  splits: {
+    paymentMethod: { key: string; orderCount: number; valueMinor: number }[];
+    orderType: { key: string; orderCount: number; valueMinor: number }[];
+  };
+  range: DateRange;
+};
+
+export const fetchAnalytics = (period: AnalyticsPeriod, from?: string, to?: string) =>
+  apiFetch<AnalyticsOverview>(
+    `/api/staff/analytics/overview?${new URLSearchParams({
+      period,
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    })}`,
+  );
