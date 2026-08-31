@@ -340,3 +340,22 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   CANCELLED: "Cancelled",
   REFUNDED: "Refunded",
 };
+
+// ─── payments ─────────────────────────────────────────────────────────────
+
+export type PaymentState = {
+  status: OrderStatus;
+  settledMinor: number;
+  balanceDueMinor: number;
+  isPaid: boolean;
+  pending: { ussdCode: string | null; amountMinor: number } | null;
+};
+
+export const fetchPaymentState = (token: string) =>
+  apiFetch<PaymentState>(`/api/orders/track/${token}/payment`);
+
+export const startPayment = (token: string) =>
+  apiFetch<{ ussdCode: string | null; amountMinor: number; currency: string }>(
+    `/api/orders/track/${token}/pay`,
+    { method: "POST" },
+  );

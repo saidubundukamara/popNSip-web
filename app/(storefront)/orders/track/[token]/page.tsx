@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { OrderTracker } from "@/components/storefront/order-tracker";
 import { API_BASE_URL } from "@/lib/api-client";
-import type { TrackedOrder } from "@/lib/menu";
+import type { PaymentState, TrackedOrder } from "@/lib/menu";
 
 export const metadata = { title: "Your order" };
 
@@ -14,5 +14,12 @@ export default async function TrackPage({ params }: { params: Promise<{ token: s
 
   const initial = (await response.json()) as TrackedOrder;
 
-  return <OrderTracker token={token} initial={initial} />;
+  // Fetched here too, so the payment panel arrives with the page rather than
+  // flashing in a moment later.
+  const paymentResponse = await fetch(`${API_BASE_URL}/api/orders/track/${token}/payment`, {
+    cache: "no-store",
+  });
+  const payment = paymentResponse.ok ? ((await paymentResponse.json()) as PaymentState) : null;
+
+  return <OrderTracker token={token} initial={initial} payment={payment} />;
 }

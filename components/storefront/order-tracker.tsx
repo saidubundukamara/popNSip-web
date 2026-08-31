@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+import { PaymentPanel } from "@/components/storefront/payment-panel";
 import { Separator } from "@/components/ui/separator";
 import { formatMinor } from "@/lib/format";
-import { fetchTrackedOrder, type TrackedOrder } from "@/lib/menu";
+import { fetchTrackedOrder, type PaymentState, type TrackedOrder } from "@/lib/menu";
 
 /**
  * The tracking page (FR-SHOP-8). Reached only by an unguessable token, and it
@@ -47,7 +48,15 @@ const HEADLINE: Record<string, string> = {
   REFUNDED: "Refunded",
 };
 
-export function OrderTracker({ token, initial }: { token: string; initial: TrackedOrder }) {
+export function OrderTracker({
+  token,
+  initial,
+  payment,
+}: {
+  token: string;
+  initial: TrackedOrder;
+  payment: PaymentState | null;
+}) {
   const [data, setData] = useState(initial);
   const isOpen = OPEN_STATUSES.has(data.order.status);
 
@@ -93,6 +102,8 @@ export function OrderTracker({ token, initial }: { token: string; initial: Track
           })}
         </ol>
       ) : null}
+
+      <PaymentPanel token={token} currency={order.currency} initial={payment} />
 
       <Separator />
 
