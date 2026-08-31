@@ -128,3 +128,31 @@
     @apply font-sans;
   }
 }
+/* ── data visualisation ───────────────────────────────────────────────────
+   Validated with the dataviz palette validator: all six checks pass against
+   both the light and dark chart surfaces. The light-mode contrast warning on
+   the paler slots is relieved by direct labels and the table view, which every
+   chart here provides.
+
+   Dark values live under `.dark`, not a prefers-color-scheme media query: this
+   app switches on a class (see @custom-variant above), so a media query would
+   darken the charts whenever the OS is dark while the page around them stayed
+   light. */
+:root {
+  --viz-series-1: #2a78d6; /* blue    — the single-series hue */
+  --viz-series-2: #eb6834; /* orange  */
+  --viz-series-3: #1baf7a; /* aqua    */
+  --viz-series-4: #eda100; /* yellow  */
+  --viz-track: oklch(0.93 0.004 264);
+  --viz-grid: oklch(0.9 0.004 264);
+}
+
+.dark {
+  /* The same hues re-stepped for the dark surface, not an automatic flip. */
+  --viz-series-1: #3987e5;
+  --viz-series-2: #d95926;
+  --viz-series-3: #199e70;
+  --viz-series-4: #c98500;
+  --viz-track: oklch(0.27 0.004 264);
+  --viz-grid: oklch(0.32 0.004 264);
+}
