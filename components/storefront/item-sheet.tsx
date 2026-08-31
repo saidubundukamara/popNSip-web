@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { toCartLine, useCart } from "@/lib/cart-store";
 import { formatDelta, formatMinor, imageUrl } from "@/lib/format";
 import type { MenuItem, ModifierGroup } from "@/lib/menu";
 
@@ -32,6 +33,8 @@ export function ItemSheet({
   const [variantId, setVariantId] = useState<string | null>(item.variants[0]?.id ?? null);
   const [chosen, setChosen] = useState<Record<string, string[]>>({});
   const [quantity, setQuantity] = useState(1);
+  const [notes, setNotes] = useState("");
+  const add = useCart((state) => state.add);
 
   const unitPriceMinor = useMemo(() => {
     const base = variantId
@@ -174,6 +177,20 @@ export function ItemSheet({
             );
           })}
 
+          <div className="flex flex-col gap-2">
+            <label htmlFor="notes" className="text-sm font-medium">
+              Anything to tell the kitchen?
+            </label>
+            <input
+              id="notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              maxLength={280}
+              placeholder="e.g. no onions"
+              className="border-input bg-background h-10 rounded-md border px-3 text-sm"
+            />
+          </div>
+
           <Separator />
 
           <div className="flex items-center justify-between gap-4">
@@ -202,7 +219,15 @@ export function ItemSheet({
               </Button>
             </div>
 
-            <Button type="button" disabled={!canAdd} className="flex-1">
+            <Button
+              type="button"
+              disabled={!canAdd}
+              className="flex-1"
+              onClick={() => {
+                add(toCartLine(item, variantId, chosen, quantity, notes.trim() || null));
+                onOpenChange(false);
+              }}
+            >
               Add to cart · {formatMinor(unitPriceMinor * quantity, currency)}
             </Button>
           </div>

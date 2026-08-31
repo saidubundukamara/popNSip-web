@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { MenuBrowser } from "@/components/storefront/menu-browser";
 import { API_BASE_URL } from "@/lib/api-client";
 import type { PublicMenu } from "@/lib/menu";
@@ -31,5 +33,10 @@ export default async function StorefrontPage() {
     );
   }
 
-  return <MenuBrowser menu={menu} />;
+  // useSearchParams (the ?table= binding) needs a boundary to suspend against.
+  return (
+    <Suspense>
+      <MenuBrowser menu={menu} />
+    </Suspense>
+  );
 }

@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
+import { CartBar } from "@/components/storefront/cart-bar";
 import { ItemSheet } from "@/components/storefront/item-sheet";
+import { useCart } from "@/lib/cart-store";
 import { formatMinor, imageUrl } from "@/lib/format";
 import { fromPriceMinor, type MenuItem, type PublicMenu } from "@/lib/menu";
 
@@ -14,6 +17,16 @@ import { fromPriceMinor, type MenuItem, type PublicMenu } from "@/lib/menu";
 export function MenuBrowser({ menu }: { menu: PublicMenu }) {
   const [selected, setSelected] = useState<MenuItem | null>(null);
   const categories = menu.categories.filter((category) => category.items.length > 0);
+
+  // FR-SHOP-9: a QR link of the form /?table=T4 binds the session to a table.
+  // Stored in the cart so it survives the walk through the menu to checkout.
+  const searchParams = useSearchParams();
+  const tableParam = searchParams.get("table");
+  const setTableCode = useCart((state) => state.setTableCode);
+
+  useEffect(() => {
+    if (tableParam) setTableCode(tableParam.trim().toUpperCase());
+  }, [tableParam, setTableCode]);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -84,6 +97,8 @@ export function MenuBrowser({ menu }: { menu: PublicMenu }) {
           </section>
         ))}
       </main>
+
+      <CartBar currency={menu.branch.currency} />
 
       {selected ? (
         <ItemSheet
