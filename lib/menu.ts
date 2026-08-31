@@ -227,3 +227,116 @@ export type TrackedOrder = {
 };
 
 export const fetchTrackedOrder = (token: string) => apiFetch<TrackedOrder>(`/api/orders/track/${token}`);
+
+// ─── staff orders ─────────────────────────────────────────────────────────
+
+export type OrderStatus =
+  | "DRAFT"
+  | "AWAITING_PAYMENT"
+  | "PENDING_CONFIRMATION"
+  | "CONFIRMED"
+  | "PREPARING"
+  | "READY"
+  | "OUT_FOR_DELIVERY"
+  | "SERVED"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "REFUNDED";
+
+export type StaffOrder = {
+  id: string;
+  reference: string;
+  status: OrderStatus;
+  type: "DELIVERY" | "PICKUP" | "DINE_IN" | "WALK_IN";
+  channel: string;
+  placedAt: string;
+  subtotalMinor: number;
+  adjustmentsMinor: number;
+  totalMinor: number;
+  currency: string;
+  deliveryAddress: string | null;
+  deliveryNotes: string | null;
+  customer: { name: string | null; phoneE164: string } | null;
+  table: { code: string; label: string } | null;
+  items: {
+    id: string;
+    itemNameSnapshot: string;
+    variantNameSnapshot: string | null;
+    quantity: number;
+    lineTotalMinor: number;
+    notes: string | null;
+    modifiers: { nameSnapshot: string; priceMinor: number }[];
+  }[];
+  payments: { id: string; status: string; amountMinor: number; method: string }[];
+};
+
+export const fetchQueue = () => apiFetch<{ orders: StaffOrder[] }>("/api/staff/orders");
+
+export const searchOrders = (params: Record<string, string>) =>
+  apiFetch<{ orders: StaffOrder[] }>(`/api/staff/orders?${new URLSearchParams({ ...params, open: "false" })}`);
+
+export const setOrderStatus = (id: string, status: OrderStatus, reason?: string) =>
+  apiFetch<{ order: StaffOrder; changed: boolean }>(`/api/staff/orders/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, ...(reason ? { reason } : {}) }),
+  });
+
+export const addAdjustment = (id: string, label: string, amountMinor: number) =>
+  apiFetch<{ order: StaffOrder }>(`/api/staff/orders/${id}/adjustments`, {
+    method: "POST",
+    body: JSON.stringify({ label, amountMinor }),
+  });
+
+export const recordCash = (id: string, amountMinor: number, tenderedMinor?: number) =>
+  apiFetch<{ changeMinor: number; balanceDueMinor: number }>(`/api/staff/orders/${id}/payments`, {
+    method: "POST",
+    body: JSON.stringify({ amountMinor, ...(tenderedMinor ? { tenderedMinor } : {}) }),
+  });
+
+export const cancelOrder = (id: string, reason: string) =>
+  apiFetch<{ order: StaffOrder }>(`/api/staff/orders/${id}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+
+export const createPosOrder = (body: {
+  lines: { menuItemId: string; variantId?: string; modifierIds: string[]; quantity: number; notes?: string }[];
+  customer?: { name?: string; phone?: string };
+}) => apiFetch<{ order: StaffOrder }>("/api/staff/orders", { method: "POST", body: JSON.stringify(body) });
+
+/** Which transitions the POS should offer, mirroring the server's table. */
+export function nextActions(status: OrderStatus, type: StaffOrder["type"]): OrderStatus[] {
+  switch (status) {
+    case "PENDING_CONFIRMATION":
+      return ["CONFIRMED"];
+    case "AWAITING_PAYMENT":
+      return [];
+    case "CONFIRMED":
+      return ["PREPARING"];
+    case "PREPARING":
+      return ["READY"];
+    case "READY":
+      if (type === "DELIVERY") return ["OUT_FOR_DELIVERY"];
+      if (type === "DINE_IN") return ["SERVED"];
+      return ["COMPLETED"];
+    case "OUT_FOR_DELIVERY":
+    case "SERVED":
+      return ["COMPLETED"];
+    default:
+      return [];
+  }
+}
+
+export const STATUS_LABELS: Record<OrderStatus, string> = {
+  DRAFT: "Draft",
+  AWAITING_PAYMENT: "Awaiting payment",
+  PENDING_CONFIRMATION: "New",
+  CONFIRMED: "Accepted",
+  PREPARING: "Preparing",
+  READY: "Ready",
+  OUT_FOR_DELIVERY: "Out for delivery",
+  SERVED: "Served",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+  REFUNDED: "Refunded",
+};

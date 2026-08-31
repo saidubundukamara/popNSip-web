@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 
 import { API_BASE_URL, type SessionUser } from "@/lib/api-client";
-import type { Category } from "@/lib/menu";
+import type { Category, StaffOrder } from "@/lib/menu";
 
 /**
  * Server-component API access. `credentials: 'include'` means nothing on the
@@ -31,4 +31,10 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 export async function getManagedMenu(): Promise<Category[]> {
   const body = await serverApiFetch<{ categories: Category[] }>("/api/staff/menu");
   return body?.categories ?? [];
+}
+
+/** The open queue, fetched on the server so the page arrives populated. */
+export async function getQueue(): Promise<StaffOrder[]> {
+  const body = await serverApiFetch<{ orders: StaffOrder[] }>("/api/staff/orders");
+  return body?.orders ?? [];
 }
