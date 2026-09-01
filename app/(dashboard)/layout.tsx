@@ -1,60 +1,42 @@
 import { redirect } from "next/navigation";
 
-import Link from "next/link";
-
-import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { MobileNav } from "@/components/dashboard/shell/mobile-nav";
+import { OrderAlertsProvider } from "@/components/dashboard/shell/order-alerts";
+import { Sidebar } from "@/components/dashboard/shell/sidebar";
+import { Topbar } from "@/components/dashboard/shell/topbar";
 import { getSessionUser } from "@/lib/api-server";
 
 /**
  * The dashboard shell. Unlike the middleware, this asks the API who the user
  * actually is — a cookie that exists but no longer resolves to an active
  * account ends up here and is redirected out.
+ *
+ * `data-density="touch"` is the whole reason the staff side can share
+ * components with the customer storefront: the shared primitives stay compact
+ * for the phone-sized shop, and this scope lifts every control inside the
+ * dashboard to a 44px floor for a thumb on a counter tablet.
  */
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
   return (
-    <div className="flex min-h-full flex-col">
-      <header className="border-b">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="block">
-              <p className="text-sm font-semibold tracking-tight">popNsip</p>
-              <p className="text-muted-foreground text-xs">Staff dashboard</p>
-            </Link>
+    <TooltipProvider delayDuration={300}>
+      <OrderAlertsProvider>
+        <div data-density="touch" className="bg-background flex min-h-full">
+          <Sidebar user={user} />
 
-            <nav className="flex items-center gap-1">
-              {[
-                { href: "/dashboard/queue", label: "Queue" },
-                { href: "/dashboard/pos", label: "POS" },
-                { href: "/dashboard/menu", label: "Menu" },
-                { href: "/dashboard/analytics", label: "Analytics" },
-              ].map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="hover:bg-muted rounded-md px-3 py-1.5 text-sm font-medium"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Topbar user={user} />
+            <main className="min-w-0 flex-1 px-4 pt-5 pb-24 md:px-6 md:pb-8">{children}</main>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm font-medium leading-none">{user.name}</p>
-              <p className="text-muted-foreground text-xs">{user.role.toLowerCase()}</p>
-            </div>
-            <SignOutButton />
-          </div>
+          <MobileNav user={user} />
         </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>
-      <Toaster />
-    </div>
+        <Toaster position="top-right" />
+      </OrderAlertsProvider>
+    </TooltipProvider>
   );
 }

@@ -4,12 +4,55 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── theme bridge ─────────────────────────────────────────────────────────
+   Every raw token below is exposed as a Tailwind colour so call sites read
+   `bg-brand-700` / `text-st-preparing` rather than an arbitrary-value var. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+
+  /* Status pairs. `-bg` is the tint, the bare name is the ink; every pair is
+     verified at 6:1 or better so a chip label is readable at arm's length. */
+  --color-st-pending: var(--st-pending);
+  --color-st-pending-bg: var(--st-pending-bg);
+  --color-st-unpaid: var(--st-unpaid);
+  --color-st-unpaid-bg: var(--st-unpaid-bg);
+  --color-st-confirmed: var(--st-confirmed);
+  --color-st-confirmed-bg: var(--st-confirmed-bg);
+  --color-st-preparing: var(--st-preparing);
+  --color-st-preparing-bg: var(--st-preparing-bg);
+  --color-st-ready: var(--st-ready);
+  --color-st-ready-bg: var(--st-ready-bg);
+  --color-st-delivering: var(--st-delivering);
+  --color-st-delivering-bg: var(--st-delivering-bg);
+  --color-st-served: var(--st-served);
+  --color-st-served-bg: var(--st-served-bg);
+  --color-st-done: var(--st-done);
+  --color-st-done-bg: var(--st-done-bg);
+  --color-st-void: var(--st-void);
+  --color-st-void-bg: var(--st-void-bg);
+
+  --color-age-ok: var(--age-ok);
+  --color-age-warn: var(--age-warn);
+  --color-age-late: var(--age-late);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -18,11 +61,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -48,73 +86,149 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ── palette ──────────────────────────────────────────────────────────────
+   Sampled from the reference designs in ../UI and re-stepped so every
+   foreground/background pair clears WCAG AA. The reference's own orange is
+   #EF8435, which is 2.62:1 against white text and fails outright — so 500
+   keeps that exact hue for identity (logo, rails, indicators) while the fill
+   and text roles step deeper. Ratios in the comments are measured, not
+   estimated. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --brand-50: #fef6ef;
+  --brand-100: #fce7d4;
+  --brand-200: #f9cba6;
+  --brand-300: #f5ac76;
+  --brand-400: #f2934e;
+  --brand-500: #ef8435; /* the reference orange — identity only, never text */
+  --brand-600: #dc6a18;
+  --brand-700: #c2410c; /* primary action fill, white label — 5.18:1 */
+  --brand-800: #9a3412; /* brand text on a tint — 6.38:1 on brand-50/100 */
+  --brand-900: #7c2d12;
+
+  --background: #fafbfd;
+  --surface: #ffffff;
+  --surface-2: #f4f6f9; /* sidebar, table headers, rails */
+  --foreground: #14171f;
+  --muted-foreground: #5b6472; /* 4.9:1 on the page ground */
+  --border: #e3e8ef;
+
+  /* Status. Hue assignments follow the reference; depths do not.
+     AWAITING_PAYMENT moves from the reference's amber to rose on purpose:
+     unpaid is the state that costs money if missed, and amber sits too close
+     to the brand orange to read as an alarm. */
+  --st-pending: #9a3412;
+  --st-pending-bg: #ffedd5; /* 6.38:1 */
+  --st-unpaid: #9f1239;
+  --st-unpaid-bg: #ffe4e6; /* 6.68:1 */
+  --st-confirmed: #334155;
+  --st-confirmed-bg: #e2e8f0; /* 9.15:1 */
+  --st-preparing: #1e40af;
+  --st-preparing-bg: #dbeafe; /* 7.15:1 */
+  --st-ready: #166534;
+  --st-ready-bg: #dcfce7; /* 6.49:1 */
+  --st-delivering: #5b21b6;
+  --st-delivering-bg: #ede9fe; /* 7.57:1 */
+  --st-served: #155e75;
+  --st-served-bg: #cffafe; /* 6.49:1 */
+  --st-done: #166534;
+  --st-done-bg: #dcfce7;
+  --st-void: #475569;
+  --st-void-bg: #f1f5f9;
+
+  /* The age rail. Colour is never the only signal — the card prints the
+     elapsed figure beside it. */
+  --age-ok: #16a34a;
+  --age-warn: #ef8435;
+  --age-late: #be123c;
+
+  /* shadcn semantic aliases, mapped onto the palette above. */
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--foreground);
+  --primary: var(--brand-700);
+  --primary-foreground: #ffffff;
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface-2);
+  --accent: var(--brand-50);
+  --accent-foreground: var(--brand-800);
+  --destructive: #b91c1c; /* 6.05:1 with white */
+  --input: var(--border);
+  --ring: var(--brand-500);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--brand-700);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--brand-50);
+  --sidebar-accent-foreground: var(--brand-800);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--brand-500);
 }
 
+/* Kept token-complete and correct so nothing rots, but no provider mounts it
+   and no toggle exists — the product ships light-only for now. Glare, not
+   darkness, is the condition at a Freetown counter. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #0e1116;
+  --surface: #161b22;
+  --surface-2: #1c222b;
+  --foreground: #f2f5f9;
+  --muted-foreground: #9aa5b4;
+  --border: oklch(1 0 0 / 12%);
+
+  --brand-500: #f2934e;
+  --brand-700: #e2691f;
+  --brand-800: #f5ac76;
+
+  --st-pending: #fdba74;
+  --st-pending-bg: #431407;
+  --st-unpaid: #fda4af;
+  --st-unpaid-bg: #4c0519;
+  --st-confirmed: #cbd5e1;
+  --st-confirmed-bg: #1e293b;
+  --st-preparing: #93c5fd;
+  --st-preparing-bg: #172554;
+  --st-ready: #86efac;
+  --st-ready-bg: #052e16;
+  --st-delivering: #c4b5fd;
+  --st-delivering-bg: #2e1065;
+  --st-served: #67e8f9;
+  --st-served-bg: #083344;
+  --st-done: #86efac;
+  --st-done-bg: #052e16;
+  --st-void: #94a3b8;
+  --st-void-bg: #1e293b;
+
+  --age-ok: #4ade80;
+  --age-warn: #f2934e;
+  --age-late: #fb7185;
+
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--foreground);
+  --primary: var(--brand-700);
+  --primary-foreground: #ffffff;
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface-2);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--brand-800);
+  --destructive: #f87171;
+  --input: oklch(1 0 0 / 16%);
+  --ring: var(--brand-500);
+
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--brand-700);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--surface-2);
+  --sidebar-accent-foreground: var(--brand-800);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--brand-500);
 }
 
 @layer base {
@@ -128,6 +242,100 @@
     @apply font-sans;
   }
 }
+
+/* ── operator density ─────────────────────────────────────────────────────
+   The shared shadcn primitives are deliberately compact (Button is h-8,
+   Input h-8) because the customer storefront wants them that way. The staff
+   dashboard does not: it runs on a counter tablet, under glare, operated by a
+   thumb. Apple's floor is 44pt and Material's is 48dp.
+
+   Rather than edit 18 components' call sites, the dashboard shell sets
+   data-density="touch" and this layer lifts the defaults inside it. Anything
+   that opts out explicitly (a size prop, or data-density="compact" on an
+   inner region) still wins, because those set the height class directly and
+   these rules are scoped no deeper. */
+@layer components {
+  [data-density="touch"] {
+    --control-h: 2.75rem; /* 44px — Apple's floor; Material asks 48dp */
+    font-size: 1rem;
+  }
+
+  /* min-height only ever raises the floor, so an explicitly taller control
+     (h-14 on the POS confirm) is untouched and a 32px one is lifted. Icon
+     buttons get the width too, or they end up 32×44. Opt out with
+     `density-compact` where a genuinely dense row is wanted. */
+  /* A switch is a button too, and a 44px-tall one is a distorted blob rather
+     than a bigger target — its own hit area is handled by the label row. */
+  [data-density="touch"]
+    :is(button, [role="button"], a[data-slot="button"]):not(.density-compact):not(
+      [data-slot="switch"]
+    ) {
+    min-height: var(--control-h);
+  }
+  [data-density="touch"] [data-slot="button"][data-size^="icon"]:not(.density-compact) {
+    min-width: var(--control-h);
+  }
+  [data-density="touch"] :is(input, textarea, select):not(.density-compact) {
+    min-height: var(--control-h);
+    font-size: 1rem; /* below 16px iOS zooms the page on focus */
+  }
+}
+
+/* ── motion ───────────────────────────────────────────────────────────────
+   Three moments, all state-conveying, none decorative. */
+@keyframes settle-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes land-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--land-ring, var(--brand-500));
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+
+@keyframes rail-throb {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@utility settle {
+  animation: settle-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility land {
+  animation: land-pulse 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility throb {
+  animation: rail-throb 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ── data visualisation ───────────────────────────────────────────────────
    Validated with the dataviz palette validator: all six checks pass against
    both the light and dark chart surfaces. The light-mode contrast warning on

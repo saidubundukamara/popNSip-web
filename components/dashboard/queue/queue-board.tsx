@@ -1,148 +1,154 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { toast } from "sonner";
+import * as React from "react";
+import { Coffee, Inbox } from "lucide-react";
 
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/dashboard/shared/empty-state";
+import { FilterChip } from "@/components/dashboard/shared/filter-chips";
 import { OrderCard } from "@/components/dashboard/queue/order-card";
-import { Badge } from "@/components/ui/badge";
-import { useOrderStream } from "@/hooks/use-order-stream";
-import { fetchQueue, STATUS_LABELS, type OrderStatus, type StaffOrder } from "@/lib/menu";
+import { useOrderAlerts } from "@/components/dashboard/shell/order-alerts";
+import { STATUS_META, TONE_TEXT } from "@/lib/order-vocab";
+import type { OrderStatus, StaffOrder } from "@/lib/menu";
 
 /**
- * The live queue (FR-POS-1). Phone-first: one column of columns on a narrow
- * screen, side by side on a tablet in landscape.
+ * The live board.
+ *
+ * The version this replaces filtered out empty status groups, so advancing an
+ * order could make a whole column vanish and every card on screen jump. The
+ * card you had just tapped ended up somewhere else, and a full queue refetch
+ * redrew the board underneath it. That destroys the spatial memory a cashier
+ * relies on to work without reading.
+ *
+ * So: **lanes never move.** Every lane renders whether or not it holds
+ * anything, in the order work flows through them, and a transition patches one
+ * order in place rather than refetching thirty.
  */
+export function QueueBoard({
+  lanes,
+  emptyTitle,
+  emptyHint,
+  compact = false,
+  filter,
+}: {
+  lanes: OrderStatus[];
+  emptyTitle: string;
+  emptyHint: string;
+  compact?: boolean;
+  filter?: (order: StaffOrder) => boolean;
+}) {
+  const { orders, patch, refresh, acknowledge } = useOrderAlerts();
+  const [lane, setLane] = React.useState<OrderStatus | "ALL">("ALL");
 
-const COLUMNS: OrderStatus[] = [
-  "PENDING_CONFIRMATION",
-  "AWAITING_PAYMENT",
-  "CONFIRMED",
-  "PREPARING",
-  "READY",
-  "OUT_FOR_DELIVERY",
-  "SERVED",
-];
+  // Arriving on the board is the acknowledgement — the repeating alert has
+  // done its job once someone is looking at the thing it was pointing at.
+  React.useEffect(() => {
+    acknowledge();
+  }, [acknowledge]);
 
-export function QueueBoard({ initialOrders }: { initialOrders: StaffOrder[] }) {
-  const [orders, setOrders] = useState(initialOrders);
-  const knownIds = useRef(new Set(initialOrders.map((order) => order.id)));
+  if (orders === null) return <BoardSkeleton lanes={lanes} />;
 
-  const refresh = useCallback(async () => {
-    try {
-      const { orders: fresh } = await fetchQueue();
+  const visible = filter ? orders.filter(filter) : orders;
+  const byLane = new Map<OrderStatus, StaffOrder[]>(lanes.map((status) => [status, []]));
+  for (const order of visible) {
+    byLane.get(order.status)?.push(order);
+  }
 
-      // FR-POS-3: announce anything that was not here a moment ago.
-      const arrived = fresh.filter((order) => !knownIds.current.has(order.id));
-      knownIds.current = new Set(fresh.map((order) => order.id));
+  const total = lanes.reduce((count, status) => count + (byLane.get(status)?.length ?? 0), 0);
 
-      setOrders(fresh);
+  if (total === 0) {
+    return (
+      <div className="bg-card ring-foreground/10 rounded-xl ring-1">
+        <EmptyState icon={Coffee} title={emptyTitle} hint={emptyHint} />
+      </div>
+    );
+  }
 
-      if (arrived.length > 0) {
-        announce();
-        toast.success(
-          arrived.length === 1 ? `New order ${arrived[0]?.reference}` : `${arrived.length} new orders`,
-        );
-      }
-    } catch {
-      // The stream or the next poll will try again; a toast per failed refresh
-      // would bury the screen during a network wobble.
-    }
-  }, []);
-
-  const { mode, lastEventAt } = useOrderStream(refresh);
-
-  const grouped = COLUMNS.map((status) => ({
-    status,
-    orders: orders.filter((order) => order.status === status),
-  })).filter((column) => column.orders.length > 0);
+  const shown = lane === "ALL" ? lanes : [lane];
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Queue</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {orders.length} open {orders.length === 1 ? "order" : "orders"}
-          </p>
-        </div>
-        <ConnectionBadge mode={mode} lastEventAt={lastEventAt} />
+    <div className="flex min-w-0 flex-col gap-4">
+      {/* Phones cannot show seven lanes side by side, and a seven-deep scroll
+          is worse than a filter. Tablets and up show every lane at once. */}
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:hidden">
+        <FilterChip active={lane === "ALL"} onClick={() => setLane("ALL")} count={total}>
+          All
+        </FilterChip>
+        {lanes.map((status) => (
+          <FilterChip
+            key={status}
+            active={lane === status}
+            onClick={() => setLane(status)}
+            count={byLane.get(status)?.length ?? 0}
+          >
+            {STATUS_META[status].label}
+          </FilterChip>
+        ))}
       </div>
 
-      {grouped.length === 0 ? (
-        <p className="text-muted-foreground rounded-md border border-dashed py-16 text-center text-sm">
-          Nothing in the queue. New orders appear here on their own.
-        </p>
-      ) : (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {grouped.map((column) => (
-            <section key={column.status} className="flex flex-col gap-3">
-              <h2 className="flex items-center gap-2 text-sm font-medium">
-                {STATUS_LABELS[column.status]}
-                <Badge variant="secondary" className="tabular-nums">
-                  {column.orders.length}
-                </Badge>
-              </h2>
+      <div
+        className={cn(
+          "grid gap-4",
+          "md:h-[calc(100dvh-13rem)] md:min-h-96 md:auto-cols-[minmax(20rem,1fr)] md:grid-flow-col md:overflow-x-auto",
+        )}
+      >
+        {shown.map((status) => {
+          const laneOrders = byLane.get(status) ?? [];
+          const meta = STATUS_META[status];
 
-              <ul className="flex flex-col gap-3">
-                {column.orders.map((order) => (
-                  <li key={order.id}>
-                    <OrderCard order={order} onChanged={refresh} />
-                  </li>
-                ))}
-              </ul>
+          return (
+            <section
+              key={status}
+              className="flex min-w-0 flex-col md:min-h-0"
+              aria-label={meta.label}
+            >
+              <header className="flex items-center justify-between gap-2 pb-2">
+                <h2 className="flex items-center gap-2 text-sm font-semibold">
+                  <meta.icon className={cn("size-4", TONE_TEXT[meta.tone])} aria-hidden="true" />
+                  {meta.label}
+                </h2>
+                <span className="text-muted-foreground text-sm tabular-nums">
+                  {laneOrders.length}
+                </span>
+              </header>
+
+              <div className="flex flex-col gap-3 md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-1 md:pb-1">
+                {laneOrders.length === 0 ? (
+                  <div className="border-border rounded-xl border border-dashed">
+                    <EmptyState size="sm" icon={Inbox} title="Nothing here" />
+                  </div>
+                ) : (
+                  laneOrders.map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      compact={compact}
+                      onPatched={patch}
+                      onFailed={refresh}
+                    />
+                  ))
+                )}
+              </div>
             </section>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function ConnectionBadge({ mode, lastEventAt }: { mode: ReturnType<typeof useOrderStream>["mode"]; lastEventAt: Date | null }) {
-  const label =
-    mode === "live" ? "Live" : mode === "polling" ? "Reconnecting — checking every 10s" : "Connecting…";
 
+function BoardSkeleton({ lanes }: { lanes: OrderStatus[] }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span
-        aria-hidden
-        className={`size-2 rounded-full ${
-          mode === "live" ? "bg-emerald-500" : mode === "polling" ? "bg-amber-500" : "bg-muted-foreground/40"
-        }`}
-      />
-      <span className="text-muted-foreground">{label}</span>
-      {lastEventAt ? (
-        <span className="text-muted-foreground/70">· last update {lastEventAt.toLocaleTimeString()}</span>
-      ) : null}
+    <div className="grid gap-4 md:auto-cols-[minmax(19rem,1fr)] md:grid-flow-col">
+      {lanes.slice(0, 4).map((status) => (
+        <div key={status} className="flex flex-col gap-3">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-44 rounded-xl" />
+          <Skeleton className="h-44 rounded-xl" />
+        </div>
+      ))}
     </div>
   );
-}
-
-/**
- * FR-POS-3: staff are not staring at the screen. Built with WebAudio rather
- * than an audio file so there is nothing to 404, and wrapped because browsers
- * refuse to play until the page has been interacted with.
- */
-function announce(): void {
-  try {
-    const AudioCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtor) return;
-
-    const context = new AudioCtor();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.frequency.value = 880;
-    gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.2, context.currentTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.35);
-
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.35);
-    oscillator.onended = () => void context.close();
-  } catch {
-    // No sound is a degraded queue, not a broken one.
-  }
 }

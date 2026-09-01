@@ -267,7 +267,11 @@ export type StaffOrder = {
     notes: string | null;
     modifiers: { nameSnapshot: string; priceMinor: number }[];
   }[];
-  payments: { id: string; status: string; amountMinor: number; method: string }[];
+  /**
+   * Absent on the order returned by the POS create route, which does not
+   * include the relation. Read it through `settledMinorOf`/`balanceDueOf`.
+   */
+  payments?: { id: string; status: string; amountMinor: number; method: string }[];
 };
 
 export const fetchQueue = () => apiFetch<{ orders: StaffOrder[] }>("/api/staff/orders");
@@ -300,9 +304,63 @@ export const cancelOrder = (id: string, reason: string) =>
   });
 
 export const createPosOrder = (body: {
+  /** Defaults to WALK_IN server-side when omitted. */
+  type?: StaffOrder["type"];
+  tableCode?: string;
   lines: { menuItemId: string; variantId?: string; modifierIds: string[]; quantity: number; notes?: string }[];
   customer?: { name?: string; phone?: string };
 }) => apiFetch<{ order: StaffOrder }>("/api/staff/orders", { method: "POST", body: JSON.stringify(body) });
+
+/**
+ * The detail route returns more than the list route: the adjustments and the
+ * status history, plus payment fields the queue never needs.
+ */
+// `Omit` on payments, not an intersection: intersecting two array types
+// keeps the narrower element and the extra payment fields vanish.
+export type StaffOrderDetail = Omit<StaffOrder, "payments"> & {
+  adjustments: { id: string; label: string; amountMinor: number; createdAt: string }[];
+  statusEvents: {
+    id: string;
+    fromStatus: OrderStatus | null;
+    toStatus: OrderStatus;
+    actorType: string;
+    reason: string | null;
+    createdAt: string;
+  }[];
+  payments?: {
+    id: string;
+    status: string;
+    amountMinor: number;
+    method: string;
+    ussdCode?: string | null;
+    tenderedMinor?: number | null;
+    changeMinor?: number | null;
+    settledAt?: string | null;
+    createdAt?: string;
+  }[];
+};
+
+/** One order, with the server's own view of what may happen to it next. */
+export const fetchOrder = (id: string) =>
+  apiFetch<{
+    order: StaffOrderDetail;
+    settledMinor: number;
+    balanceDueMinor: number;
+    allowedTransitions: OrderStatus[];
+  }>(`/api/staff/orders/${id}`);
+
+export const refundOrder = (id: string, amountMinor: number, reason: string) =>
+  apiFetch<{ order: StaffOrder }>(`/api/staff/orders/${id}/refund`, {
+    method: "POST",
+    body: JSON.stringify({ amountMinor, reason }),
+  });
+
+/** The amount is the server's to decide — it charges the outstanding balance. */
+export const requestMobileMoney = (id: string, phone?: string) =>
+  apiFetch<{ ussdCode: string | null; amountMinor: number }>(
+    `/api/staff/orders/${id}/payment-request`,
+    { method: "POST", body: JSON.stringify(phone ? { phone } : {}) },
+  );
 
 /** Which transitions the POS should offer, mirroring the server's table. */
 export function nextActions(status: OrderStatus, type: StaffOrder["type"]): OrderStatus[] {

@@ -23,6 +23,7 @@ export function ItemSheet({
   currency,
   onOpenChange,
   onAdd,
+  addLabel = "Add to cart",
 }: {
   item: MenuItem;
   currency: string;
@@ -33,6 +34,12 @@ export function ItemSheet({
    * in-memory order and must not touch a customer's cart.
    */
   onAdd?: (line: Omit<CartLine, "key">) => void;
+  /**
+   * A customer adds to a cart; a cashier adds to a ticket. Same control, same
+   * rules, different room — and the word on the button has to match the room
+   * the person is standing in.
+   */
+  addLabel?: string;
 }) {
   // The parent keys this component by item id, so a different item remounts
   // with fresh state — no reset effect, and no chance of a stale selection
@@ -237,7 +244,7 @@ export function ItemSheet({
                 onOpenChange(false);
               }}
             >
-              Add to cart · {formatMinor(unitPriceMinor * quantity, currency)}
+              {addLabel} · {formatMinor(unitPriceMinor * quantity, currency)}
             </Button>
           </div>
 

@@ -1,302 +1,222 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import * as React from "react";
+import Link from "next/link";
+import { Loader2, MoreVertical, Receipt, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { formatMinor } from "@/lib/format";
-import {
-  addAdjustment,
-  cancelOrder,
-  nextActions,
-  recordCash,
-  setOrderStatus,
-  STATUS_LABELS,
-  type StaffOrder,
-} from "@/lib/menu";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { AgeLabel, AgeRail } from "@/components/dashboard/shared/age-rail";
+import { Money } from "@/components/dashboard/shared/money";
+import { StatusChip } from "@/components/dashboard/shared/status-chip";
+import { formatClock } from "@/lib/format";
+import { nextActions, setOrderStatus, type StaffOrder } from "@/lib/menu";
+import { actionFor, balanceDueOf, STATUS_META, TONE_VAR, TYPE_LABELS } from "@/lib/order-vocab";
 
-const TYPE_LABELS: Record<StaffOrder["type"], string> = {
-  DELIVERY: "Delivery",
-  PICKUP: "Pickup",
-  DINE_IN: "Dine-in",
-  WALK_IN: "Walk-in",
-};
+/**
+ * One ticket.
+ *
+ * Three things changed from the version this replaces, all of them things a
+ * cashier noticed before a designer did:
+ *
+ * - **The card says its own status.** Previously status lived only in the
+ *   column heading, so a card read on a phone — where lanes stack — told you
+ *   nothing, and "unpaid" was a pale amber tint, which is colour alone.
+ * - **The button says what the tap does.** "Preparing" is a noun printed on a
+ *   control that starts cooking. It now says "Send to kitchen".
+ * - **It ages.** The rail down the left fills against a target for the current
+ *   status, so a late ticket announces itself across a counter.
+ */
+export function OrderCard({
+  order,
+  onPatched,
+  onFailed,
+  compact = false,
+}: {
+  order: StaffOrder;
+  onPatched: (order: StaffOrder) => void;
+  onFailed: () => void;
+  compact?: boolean;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  const [landed, setLanded] = React.useState(false);
+  const previousStatus = React.useRef(order.status);
 
-/** FR-POS-1: elapsed time is the number staff actually read off the card. */
-function useElapsed(since: string): string {
-  const [now, setNow] = useState(() => Date.now());
+  // A card that moves lane is the same card in a new place. Pulse it in its
+  // destination's colour so the eye can follow it there instead of hunting.
+  React.useEffect(() => {
+    if (previousStatus.current === order.status) return;
+    previousStatus.current = order.status;
+    setLanded(true);
+    const timer = setTimeout(() => setLanded(false), 900);
+    return () => clearTimeout(timer);
+  }, [order.status]);
 
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
+  const balanceDue = balanceDueOf(order);
+  const target = nextActions(order.status, order.type)[0];
+  const action = target ? actionFor(target) : null;
+  const ActionIcon = action?.icon;
 
-  const minutes = Math.max(0, Math.floor((now - new Date(since).getTime()) / 60_000));
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-}
-
-export function OrderCard({ order, onChanged }: { order: StaffOrder; onChanged: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(false);
-  const elapsed = useElapsed(order.placedAt);
-
-  const settled = order.payments
-    .filter((payment) => payment.status === "SUCCEEDED")
-    .reduce((total, payment) => total + payment.amountMinor, 0);
-  const balanceDue = order.totalMinor - settled;
-  const actions = nextActions(order.status, order.type);
-
-  const run = async (action: () => Promise<unknown>, failure: string) => {
+  async function advance() {
+    if (!target) return;
     setBusy(true);
     try {
-      await action();
-      onChanged();
+      // The route answers `changed: false` when the order is already there
+      // (FR-POS-10), so a double tap is a no-op rather than an error.
+      const { order: updated } = await setOrderStatus(order.id, target);
+      onPatched(updated);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : failure);
+      toast.error(error instanceof Error ? error.message : "Could not move the order.", {
+        action: { label: "Try again", onClick: () => void advance() },
+      });
+      onFailed();
     } finally {
       setBusy(false);
     }
-  };
-
-  // FR-POS-5: unpaid orders have to be distinguishable at a glance.
-  const unpaid = balanceDue > 0;
-  const awaitingPayment = order.status === "AWAITING_PAYMENT";
+  }
 
   return (
-    <>
-      <article
-        className={`bg-card flex flex-col gap-3 rounded-lg border p-3 ${
-          awaitingPayment ? "border-amber-400 bg-amber-50/50" : ""
-        }`}
-      >
+    <article
+      className={cn(
+        "bg-card ring-foreground/10 settle flex gap-3 rounded-xl p-3 ring-1",
+        landed && "land",
+      )}
+      style={
+        landed
+          ? ({ "--land-ring": TONE_VAR[STATUS_META[order.status].tone] } as React.CSSProperties)
+          : undefined
+      }
+    >
+      <AgeRail placedAt={order.placedAt} status={order.status} />
+
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-medium">{order.reference}</p>
-            <p className="text-muted-foreground text-xs">
+            <p className="truncate font-semibold">{order.reference}</p>
+            <p className="text-muted-foreground truncate text-sm">
               {TYPE_LABELS[order.type]}
               {order.table ? ` · ${order.table.code}` : ""}
               {order.customer?.name ? ` · ${order.customer.name}` : ""}
             </p>
           </div>
-          <Badge variant="secondary" className="shrink-0 tabular-nums" title="Time since the order was placed">
-            {elapsed}
-          </Badge>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <StatusChip status={order.status} size="sm" />
+            <span className="text-muted-foreground text-xs">
+              <AgeLabel placedAt={order.placedAt} status={order.status} /> ·{" "}
+              {formatClock(order.placedAt)}
+            </span>
+          </div>
         </div>
 
         {order.deliveryAddress ? (
-          <p className="text-muted-foreground line-clamp-2 text-xs">{order.deliveryAddress}</p>
+          <p className="text-muted-foreground line-clamp-2 text-sm">{order.deliveryAddress}</p>
         ) : null}
 
-        <ul className="flex flex-col gap-0.5 text-sm">
-          {order.items.map((item) => (
-            <li key={item.id} className="flex gap-2">
-              <span className="text-muted-foreground tabular-nums">{item.quantity}×</span>
-              <span className="min-w-0">
-                {item.itemNameSnapshot}
-                {item.variantNameSnapshot ? (
-                  <span className="text-muted-foreground"> · {item.variantNameSnapshot}</span>
-                ) : null}
-                {item.modifiers.length > 0 ? (
-                  <span className="text-muted-foreground block text-xs">
-                    {item.modifiers.map((modifier) => modifier.nameSnapshot).join(", ")}
-                  </span>
-                ) : null}
-                {item.notes ? <span className="block text-xs italic">“{item.notes}”</span> : null}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {!compact ? (
+          <ul className="flex flex-col gap-1 text-sm">
+            {order.items.map((item) => (
+              <li key={item.id} className="flex gap-2">
+                <span className="text-muted-foreground shrink-0 font-semibold tabular-nums">
+                  {item.quantity}×
+                </span>
+                <span className="min-w-0">
+                  {item.itemNameSnapshot}
+                  {item.variantNameSnapshot ? (
+                    <span className="text-muted-foreground"> · {item.variantNameSnapshot}</span>
+                  ) : null}
+                  {item.modifiers.length > 0 ? (
+                    <span className="text-muted-foreground block text-xs">
+                      {item.modifiers.map((modifier) => modifier.nameSnapshot).join(", ")}
+                    </span>
+                  ) : null}
+                  {item.notes ? (
+                    <span className="block text-xs italic">“{item.notes}”</span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
-        <div className="flex items-center justify-between gap-2 text-sm">
-          <span className="font-medium tabular-nums">{formatMinor(order.totalMinor, order.currency)}</span>
-          <span className={`text-xs ${unpaid ? "font-medium text-amber-700" : "text-emerald-700"}`}>
-            {unpaid ? `${formatMinor(balanceDue, order.currency)} due` : "Paid"}
-          </span>
-        </div>
+        {/* FR-POS-5. A tint is not "visually distinct" on a bright counter, so
+            an outstanding balance gets a labelled bar of its own. */}
+        {balanceDue > 0 ? (
+          <p className="bg-st-unpaid-bg text-st-unpaid flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold">
+            <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
+            <span>
+              Not paid — <Money minor={balanceDue} currency={order.currency} /> due
+            </span>
+          </p>
+        ) : (
+          <p className="flex items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">Paid</span>
+            <Money minor={order.totalMinor} currency={order.currency} className="font-semibold" />
+          </p>
+        )}
 
-        {/* FR-POS-4: one primary action, everything else behind the sheet. */}
+        {balanceDue > 0 ? (
+          <p className="flex items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">Total</span>
+            <Money minor={order.totalMinor} currency={order.currency} className="font-semibold" />
+          </p>
+        ) : null}
+
+        {/* FR-POS-4: one primary action, the rest behind an overflow — but the
+            primary is always visible, never hidden inside the menu. */}
         <div className="flex gap-2">
-          {actions[0] ? (
+          {action && ActionIcon ? (
             <Button
-              size="sm"
-              className="flex-1"
+              size="touch-lg"
+              className="h-auto min-h-14 min-w-0 flex-1 py-2 text-base leading-tight whitespace-normal"
               disabled={busy}
-              onClick={() => void run(() => setOrderStatus(order.id, actions[0]!), "Could not update the order.")}
+              onClick={advance}
             >
-              {STATUS_LABELS[actions[0]]}
+              {busy ? (
+                <Loader2 className="animate-spin" aria-hidden="true" />
+              ) : (
+                <ActionIcon aria-hidden="true" />
+              )}
+              {action.label}
             </Button>
-          ) : null}
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => setOpen(true)}>
-            Details
-          </Button>
-        </div>
-      </article>
-
-      {open ? (
-        <OrderSheet order={order} balanceDue={balanceDue} onClose={() => setOpen(false)} onChanged={onChanged} />
-      ) : null}
-    </>
-  );
-}
-
-function OrderSheet({
-  order,
-  balanceDue,
-  onClose,
-  onChanged,
-}: {
-  order: StaffOrder;
-  balanceDue: number;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [change, setChange] = useState<number | null>(null);
-
-  const run = async (action: () => Promise<unknown>, failure: string) => {
-    setBusy(true);
-    try {
-      await action();
-      onChanged();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : failure);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Sheet open onOpenChange={(value: boolean) => !value && onClose()}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle>{order.reference}</SheetTitle>
-          <SheetDescription>
-            {STATUS_LABELS[order.status]} · {TYPE_LABELS[order.type]}
-            {order.customer?.phoneE164 ? ` · ${order.customer.phoneE164}` : ""}
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="flex flex-col gap-6 px-4 pb-8">
-          <dl className="flex flex-col gap-1 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Subtotal</dt>
-              <dd className="tabular-nums">{formatMinor(order.subtotalMinor, order.currency)}</dd>
-            </div>
-            {order.adjustmentsMinor !== 0 ? (
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Adjustments</dt>
-                <dd className="tabular-nums">{formatMinor(order.adjustmentsMinor, order.currency)}</dd>
-              </div>
-            ) : null}
-            <div className="flex justify-between font-medium">
-              <dt>Total</dt>
-              <dd className="tabular-nums">{formatMinor(order.totalMinor, order.currency)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Outstanding</dt>
-              <dd className="tabular-nums">{formatMinor(balanceDue, order.currency)}</dd>
-            </div>
-          </dl>
-
-          {/* ── delivery fee / discount ── */}
-          <form
-            className="flex flex-col gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const data = new FormData(event.currentTarget);
-              const leones = Number(data.get("amount"));
-              const label = String(data.get("label") ?? "").trim();
-              if (!label || !Number.isFinite(leones) || leones === 0) return;
-              event.currentTarget.reset();
-              void run(() => addAdjustment(order.id, label, Math.round(leones * 100)), "Could not adjust the order.");
-            }}
-          >
-            <p className="text-sm font-medium">Adjustment</p>
-            <div className="flex gap-2">
-              <Input name="label" placeholder="Delivery fee" aria-label="Adjustment label" />
-              <Input name="amount" type="number" step="0.01" placeholder="Le" aria-label="Amount" className="w-28" />
-              <Button type="submit" variant="outline" size="sm" disabled={busy}>
-                Add
-              </Button>
-            </div>
-            <p className="text-muted-foreground text-xs">Use a negative amount for a discount.</p>
-          </form>
-
-          {/* ── cash ── */}
-          {balanceDue > 0 ? (
-            <form
-              className="flex flex-col gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const data = new FormData(event.currentTarget);
-                const tendered = Number(data.get("tendered"));
-                event.currentTarget.reset();
-
-                void run(async () => {
-                  const result = await recordCash(
-                    order.id,
-                    balanceDue,
-                    Number.isFinite(tendered) && tendered > 0 ? Math.round(tendered * 100) : undefined,
-                  );
-                  setChange(result.changeMinor);
-                }, "Could not record the payment.");
-              }}
+          ) : (
+            <Button
+              size="touch-lg"
+              variant="outline"
+              className="h-auto min-h-14 min-w-0 flex-1 py-2 text-base leading-tight whitespace-normal"
+              asChild
             >
-              <p className="text-sm font-medium">Take cash</p>
-              <div className="flex gap-2">
-                <Input
-                  name="tendered"
-                  type="number"
-                  step="0.01"
-                  placeholder="Tendered (Le)"
-                  aria-label="Amount tendered"
-                />
-                <Button type="submit" size="sm" disabled={busy}>
-                  Record {formatMinor(balanceDue, order.currency)}
-                </Button>
-              </div>
-              {change !== null ? (
-                <p className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900">
-                  Change due: {formatMinor(change, order.currency)}
-                </p>
-              ) : null}
-            </form>
-          ) : null}
+              <Link href={`/dashboard/orders/${order.id}`}>
+                <Receipt aria-hidden="true" />
+                Open order
+              </Link>
+            </Button>
+          )}
 
-          {/* ── cancel ── */}
-          <form
-            className="flex flex-col gap-2 border-t pt-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const reason = String(new FormData(event.currentTarget).get("reason") ?? "").trim();
-              if (!reason) return;
-              void run(async () => {
-                await cancelOrder(order.id, reason);
-                onClose();
-              }, "Could not cancel the order.");
-            }}
-          >
-            <p className="text-sm font-medium">Cancel order</p>
-            <div className="flex gap-2">
-              <Input name="reason" placeholder="Reason" aria-label="Cancellation reason" required />
-              <Button type="submit" variant="destructive" size="sm" disabled={busy}>
-                Cancel
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon-touch" variant="outline" className="h-auto min-h-14 self-stretch">
+                <MoreVertical aria-hidden="true" />
+                <span className="sr-only">More for {order.reference}</span>
               </Button>
-            </div>
-            <p className="text-muted-foreground text-xs">Manager or owner only. A reason is required.</p>
-          </form>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/orders/${order.id}`}>
+                  <Receipt aria-hidden="true" />
+                  Open order
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </article>
   );
 }
