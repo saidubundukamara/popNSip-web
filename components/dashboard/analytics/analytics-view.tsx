@@ -66,20 +66,17 @@ export function AnalyticsView({ initial }: { initial: AnalyticsOverview }) {
 
   return (
     <div className={`flex flex-col gap-6 ${loading ? "opacity-60" : ""}`}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {describeRange(summary.range)} · {summary.range.timezone}
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-muted-foreground text-sm">
+          {describeRange(summary.range)} · {summary.range.timezone}
+        </p>
 
         {/* Filters in one row above the charts. */}
-        <div className="flex gap-1" role="group" aria-label="Period">
+        <div className="flex gap-1.5" role="group" aria-label="Period">
           {PERIODS.map((option) => (
             <Button
               key={option.value}
-              size="sm"
+              size="touch"
               variant={period === option.value ? "default" : "outline"}
               onClick={() => choose(option.value)}
               disabled={loading}

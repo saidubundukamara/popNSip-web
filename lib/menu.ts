@@ -449,3 +449,17 @@ export const fetchAnalytics = (period: AnalyticsPeriod, from?: string, to?: stri
       ...(to ? { to } : {}),
     })}`,
   );
+
+/**
+ * The sold-out board (FR-MENU-5). Available to any signed-in staff member,
+ * unlike the rest of the menu API — running out of something is discovered at
+ * the counter and has to come off the storefront that minute.
+ */
+export type AvailabilityCategory = {
+  id: string;
+  name: string;
+  items: { id: string; name: string; isAvailable: boolean }[];
+};
+
+export const fetchAvailability = () =>
+  apiFetch<{ categories: AvailabilityCategory[] }>("/api/staff/menu/availability");

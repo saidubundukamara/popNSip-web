@@ -18,7 +18,7 @@ export default function DeliveryPage() {
       />
       <QueueBoard
         lanes={["CONFIRMED", "PREPARING", "READY", "OUT_FOR_DELIVERY"]}
-        filter={(order) => order.type === "DELIVERY"}
+        types={["DELIVERY"]}
         emptyTitle="No deliveries right now"
         emptyHint="Delivery orders show up here the moment they are accepted, with the address on the card."
       />

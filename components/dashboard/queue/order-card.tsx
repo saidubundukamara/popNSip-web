@@ -18,7 +18,13 @@ import { Money } from "@/components/dashboard/shared/money";
 import { StatusChip } from "@/components/dashboard/shared/status-chip";
 import { formatClock } from "@/lib/format";
 import { nextActions, setOrderStatus, type StaffOrder } from "@/lib/menu";
-import { actionFor, balanceDueOf, STATUS_META, TONE_VAR, TYPE_LABELS } from "@/lib/order-vocab";
+import {
+  actionFor,
+  balanceDueOf,
+  STATUS_META,
+  TONE_VAR,
+  TYPE_LABELS,
+} from "@/lib/order-vocab";
 
 /**
  * One ticket.
@@ -38,12 +44,17 @@ export function OrderCard({
   order,
   onPatched,
   onFailed,
-  compact = false,
+  showMoney = true,
 }: {
   order: StaffOrder;
   onPatched: (order: StaffOrder) => void;
   onFailed: () => void;
-  compact?: boolean;
+  /**
+   * Off on the kitchen screen. Whoever is at the stove needs the food and the
+   * clock; a total and a "not paid" warning they can do nothing about is noise
+   * on a screen being read from two metres away.
+   */
+  showMoney?: boolean;
 }) {
   const [busy, setBusy] = React.useState(false);
   const [landed, setLanded] = React.useState(false);
@@ -73,9 +84,12 @@ export function OrderCard({
       const { order: updated } = await setOrderStatus(order.id, target);
       onPatched(updated);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not move the order.", {
-        action: { label: "Try again", onClick: () => void advance() },
-      });
+      toast.error(
+        error instanceof Error ? error.message : "Could not move the order.",
+        {
+          action: { label: "Try again", onClick: () => void advance() },
+        },
+      );
       onFailed();
     } finally {
       setBusy(false);
@@ -90,7 +104,9 @@ export function OrderCard({
       )}
       style={
         landed
-          ? ({ "--land-ring": TONE_VAR[STATUS_META[order.status].tone] } as React.CSSProperties)
+          ? ({
+              "--land-ring": TONE_VAR[STATUS_META[order.status].tone],
+            } as React.CSSProperties)
           : undefined
       }
     >
@@ -116,55 +132,62 @@ export function OrderCard({
         </div>
 
         {order.deliveryAddress ? (
-          <p className="text-muted-foreground line-clamp-2 text-sm">{order.deliveryAddress}</p>
+          <p className="text-muted-foreground line-clamp-2 text-sm">
+            {order.deliveryAddress}
+          </p>
         ) : null}
 
-        {!compact ? (
-          <ul className="flex flex-col gap-1 text-sm">
-            {order.items.map((item) => (
-              <li key={item.id} className="flex gap-2">
-                <span className="text-muted-foreground shrink-0 font-semibold tabular-nums">
-                  {item.quantity}×
-                </span>
-                <span className="min-w-0">
-                  {item.itemNameSnapshot}
-                  {item.variantNameSnapshot ? (
-                    <span className="text-muted-foreground"> · {item.variantNameSnapshot}</span>
-                  ) : null}
-                  {item.modifiers.length > 0 ? (
-                    <span className="text-muted-foreground block text-xs">
-                      {item.modifiers.map((modifier) => modifier.nameSnapshot).join(", ")}
-                    </span>
-                  ) : null}
-                  {item.notes ? (
-                    <span className="block text-xs italic">“{item.notes}”</span>
-                  ) : null}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        <ul className="flex flex-col gap-1 text-sm">
+          {order.items.map((item) => (
+            <li key={item.id} className="flex gap-2">
+              <span className="text-muted-foreground shrink-0 font-semibold tabular-nums">
+                {item.quantity}×
+              </span>
+              <span className="min-w-0">
+                {item.itemNameSnapshot}
+                {item.variantNameSnapshot ? (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {item.variantNameSnapshot}
+                  </span>
+                ) : null}
+                {item.modifiers.length > 0 ? (
+                  <span className="text-muted-foreground block text-xs">
+                    {item.modifiers
+                      .map((modifier) => modifier.nameSnapshot)
+                      .join(", ")}
+                  </span>
+                ) : null}
+                {item.notes ? (
+                  <span className="block text-xs italic">“{item.notes}”</span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
 
         {/* FR-POS-5. A tint is not "visually distinct" on a bright counter, so
             an outstanding balance gets a labelled bar of its own. */}
-        {balanceDue > 0 ? (
+        {showMoney && balanceDue > 0 ? (
           <p className="bg-st-unpaid-bg text-st-unpaid flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold">
             <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
             <span>
-              Not paid — <Money minor={balanceDue} currency={order.currency} /> due
+              Not paid — <Money minor={balanceDue} currency={order.currency} />{" "}
+              due
             </span>
           </p>
-        ) : (
-          <p className="flex items-center justify-between gap-2 text-sm">
-            <span className="text-muted-foreground">Paid</span>
-            <Money minor={order.totalMinor} currency={order.currency} className="font-semibold" />
-          </p>
-        )}
+        ) : null}
 
-        {balanceDue > 0 ? (
+        {showMoney ? (
           <p className="flex items-center justify-between gap-2 text-sm">
-            <span className="text-muted-foreground">Total</span>
-            <Money minor={order.totalMinor} currency={order.currency} className="font-semibold" />
+            <span className="text-muted-foreground">
+              {balanceDue > 0 ? "Total" : "Paid"}
+            </span>
+            <Money
+              minor={order.totalMinor}
+              currency={order.currency}
+              className="font-semibold"
+            />
           </p>
         ) : null}
 
@@ -201,7 +224,11 @@ export function OrderCard({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon-touch" variant="outline" className="h-auto min-h-14 self-stretch">
+              <Button
+                size="icon-touch"
+                variant="outline"
+                className="h-auto min-h-14 self-stretch"
+              >
                 <MoreVertical aria-hidden="true" />
                 <span className="sr-only">More for {order.reference}</span>
               </Button>

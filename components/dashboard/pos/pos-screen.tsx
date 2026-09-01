@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   Loader2,
@@ -20,6 +21,7 @@ import { ItemSheet } from "@/components/storefront/item-sheet";
 import { EmptyState } from "@/components/dashboard/shared/empty-state";
 import { FilterChip } from "@/components/dashboard/shared/filter-chips";
 import { Money } from "@/components/dashboard/shared/money";
+import { SoldOutSheet } from "@/components/dashboard/pos/sold-out-sheet";
 import { TenderPanel } from "@/components/dashboard/pos/tender-panel";
 import { useOrderAlerts } from "@/components/dashboard/shell/order-alerts";
 import { formatMinor, imageUrl } from "@/lib/format";
@@ -75,6 +77,7 @@ function lineTotal(line: Line): number {
  * here is the price; the total shown is a courtesy until the server says so.
  */
 export function PosScreen({ menu }: { menu: PublicMenu }) {
+  const router = useRouter();
   const { refresh, noteOwnOrder } = useOrderAlerts();
   const [selected, setSelected] = React.useState<MenuItem | null>(null);
   const [lines, setLines] = React.useState<Line[]>([]);
@@ -175,6 +178,10 @@ export function PosScreen({ menu }: { menu: PublicMenu }) {
               className="pl-9"
             />
           </div>
+          {/* The grid below is the public menu, which hides sold-out items —
+              so putting one back has to happen somewhere they are still
+              listed. */}
+          <SoldOutSheet onChanged={() => router.refresh()} />
         </div>
 
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">

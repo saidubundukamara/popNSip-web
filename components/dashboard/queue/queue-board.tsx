@@ -29,14 +29,21 @@ export function QueueBoard({
   lanes,
   emptyTitle,
   emptyHint,
-  compact = false,
-  filter,
+  showMoney = true,
+  types,
 }: {
   lanes: OrderStatus[];
   emptyTitle: string;
   emptyHint: string;
-  compact?: boolean;
-  filter?: (order: StaffOrder) => boolean;
+  /** Off on the kitchen screen; see OrderCard. */
+  showMoney?: boolean;
+  /**
+   * Narrow the board to certain order types. A plain array rather than a
+   * predicate on purpose: the pages that render this board are server
+   * components, and a function cannot cross the server/client boundary — the
+   * delivery board threw on every load until this stopped being a callback.
+   */
+  types?: StaffOrder["type"][];
 }) {
   const { orders, patch, refresh, acknowledge } = useOrderAlerts();
   const [lane, setLane] = React.useState<OrderStatus | "ALL">("ALL");
@@ -49,7 +56,7 @@ export function QueueBoard({
 
   if (orders === null) return <BoardSkeleton lanes={lanes} />;
 
-  const visible = filter ? orders.filter(filter) : orders;
+  const visible = types ? orders.filter((order) => types.includes(order.type)) : orders;
   const byLane = new Map<OrderStatus, StaffOrder[]>(
     lanes.map((status) => [status, []]),
   );
@@ -140,7 +147,7 @@ export function QueueBoard({
                       <OrderCard
                         key={order.id}
                         order={order}
-                        compact={compact}
+                        showMoney={showMoney}
                         onPatched={patch}
                         onFailed={refresh}
                       />

@@ -18,6 +18,7 @@ export default function KitchenPage() {
       />
       <QueueBoard
         lanes={KITCHEN_LANES}
+        showMoney={false}
         emptyTitle="Nothing to cook"
         emptyHint="Accepted orders appear here as soon as the counter sends them through."
       />
