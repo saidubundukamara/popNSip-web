@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 
 import { API_BASE_URL, type SessionUser } from "@/lib/api-client";
@@ -21,11 +22,23 @@ async function serverApiFetch<T>(path: string): Promise<T | null> {
   return (await response.json()) as T;
 }
 
-/** The signed-in user, or null. The API is the authority, not the cookie. */
-export async function getSessionUser(): Promise<SessionUser | null> {
+/**
+ * The signed-in user, or null. The API is the authority, not the cookie.
+ *
+ * Wrapped in React's `cache` because the shell asks this and so does most
+ * pages inside it — a single dashboard render was making two round trips to
+ * `/api/auth/me` for the same answer, and three when a stale cookie sent it
+ * through the login redirect as well.
+ *
+ * This does not weaken the "session state is never served from a cache" rule:
+ * `cache` is scoped to one server render pass and is thrown away with it, so
+ * the next request still asks the API. Deactivating an account still takes
+ * effect on the very next navigation.
+ */
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const body = await serverApiFetch<{ user: SessionUser }>("/api/auth/me");
   return body?.user ?? null;
-}
+});
 
 /** The manager's menu, fetched on the server so the page arrives populated. */
 export async function getManagedMenu(): Promise<Category[]> {
