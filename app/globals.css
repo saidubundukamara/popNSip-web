@@ -313,6 +313,18 @@
   }
 }
 
+/**
+ * A horizontally scrolling board still contributes its full content width to
+ * the *document's* scroll extent in Chrome, so the queue gave the whole page a
+ * sideways scrollbar into 681px of nothing while the board itself scrolled
+ * correctly. `contain: paint` promises the browser that nothing inside paints
+ * outside the box, which settles it. `overflow-x: clip` on an ancestor does
+ * not — the overflow is contributed, not painted.
+ */
+@utility contain-paint {
+  contain: paint;
+}
+
 @utility settle {
   animation: settle-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }

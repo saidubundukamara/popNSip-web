@@ -373,10 +373,12 @@ export function OrderDetail({ id, role }: { id: string; role: StaffRole }) {
             <TenderPanel
               order={order}
               dueMinor={balanceDueMinor}
-              onSettled={() => {
-                void load();
-                refresh();
-              }}
+              doneLabel="Done"
+              deferLabel="They will pay later"
+              // Only the live feed is told straight away. Reloading this order
+              // here would drop the balance to zero and take the change-due
+              // figure off the screen with it.
+              onSettled={refresh}
               onDone={() => void load()}
             />
           </section>

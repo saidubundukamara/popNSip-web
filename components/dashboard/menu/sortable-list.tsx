@@ -19,7 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 /**
  * Drag-to-reorder over a vertical list. dnd-kit rather than a mouse-only
@@ -35,6 +35,7 @@ export function SortableList<T extends { id: string }>({
   onReorder: (ids: string[]) => void;
   renderItem: (item: T) => ReactNode;
 }) {
+  const id = useId();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -53,6 +54,11 @@ export function SortableList<T extends { id: string }>({
 
   return (
     <DndContext
+      // dnd-kit numbers its screen-reader description elements from a module
+      // counter, which the server and the client increment in different orders
+      // when two lists render on one page — a hydration mismatch on every row.
+      // A stable id per list settles it.
+      id={id}
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}

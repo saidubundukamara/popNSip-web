@@ -1,16 +1,19 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Archive, ImageOff, Loader2, Plus, UtensilsCrossed } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
+import { cn } from "@/lib/utils";
 import { ItemEditor } from "@/components/dashboard/menu/item-editor";
 import { SortableList } from "@/components/dashboard/menu/sortable-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { formatMinor } from "@/lib/format";
+import { ConfirmAction } from "@/components/dashboard/shared/confirm-action";
+import { EmptyState } from "@/components/dashboard/shared/empty-state";
+import { Money } from "@/components/dashboard/shared/money";
 import * as api from "@/lib/menu";
 import type { Category, MenuItem } from "@/lib/menu";
 
@@ -22,6 +25,11 @@ import type { Category, MenuItem } from "@/lib/menu";
  * Every mutation writes through the API and then reloads, rather than patching
  * local state optimistically — sortOrder is assigned server-side, so guessing
  * at it locally is how the two get out of step.
+ *
+ * Pending state is per control. A single page-wide `busy` flag meant one
+ * sold-out toggle greyed out every other control on the screen, so marking
+ * three things unavailable during a rush was three round trips taken strictly
+ * one at a time, each of them looking like the page had frozen.
  */
 export function MenuManager({ initialCategories }: { initialCategories: Category[] }) {
   const [categories, setCategories] = useState<Category[]>(initialCategories);
@@ -29,7 +37,9 @@ export function MenuManager({ initialCategories }: { initialCategories: Category
   const [editing, setEditing] = useState<MenuItem | null>(null);
   const [newCategory, setNewCategory] = useState("");
   const [newItem, setNewItem] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<Set<string>>(new Set());
+
+  const isPending = (key: string) => pending.has(key);
 
   const load = useCallback(async () => {
     try {
@@ -41,15 +51,19 @@ export function MenuManager({ initialCategories }: { initialCategories: Category
     }
   }, []);
 
-  const run = async (action: () => Promise<unknown>, failure: string) => {
-    setBusy(true);
+  const run = async (key: string, action: () => Promise<unknown>, failure: string) => {
+    setPending((current) => new Set(current).add(key));
     try {
       await action();
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : failure);
     } finally {
-      setBusy(false);
+      setPending((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
@@ -70,7 +84,7 @@ export function MenuManager({ initialCategories }: { initialCategories: Category
               setCategories((current) =>
                 ids.map((id) => current.find((c) => c.id === id)).filter((c) => c !== undefined),
               );
-              void run(() => api.reorderCategories(ids), "Could not save the new order.");
+              void run("categories", () => api.reorderCategories(ids), "Could not save the new order.");
             }}
             renderItem={(category) => (
               <button
@@ -95,7 +109,7 @@ export function MenuManager({ initialCategories }: { initialCategories: Category
               const name = newCategory.trim();
               if (!name) return;
               setNewCategory("");
-              void run(() => api.createCategory({ name }), "Could not create the category.");
+              void run("new-category", () => api.createCategory({ name }), "Could not create the category.");
             }}
           >
             <Input
@@ -104,8 +118,18 @@ export function MenuManager({ initialCategories }: { initialCategories: Category
               placeholder="New category"
               aria-label="New category name"
             />
-            <Button type="submit" size="icon" variant="outline" disabled={busy} aria-label="Add category">
-              <Plus className="size-4" />
+            <Button
+              type="submit"
+              size="icon-touch"
+              variant="outline"
+              disabled={isPending("new-category")}
+              aria-label="Add category"
+            >
+              {isPending("new-category") ? (
+                <Loader2 className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Plus aria-hidden="true" />
+              )}
             </Button>
           </form>
         </section>
@@ -116,27 +140,54 @@ export function MenuManager({ initialCategories }: { initialCategories: Category
               {selected ? selected.name : "Items"}
             </h2>
             {selected ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  void run(() => api.archiveCategory(selected.id), "Could not archive the category.").then(() =>
-                    setSelectedId(null),
-                  )
+              <ConfirmAction
+                trigger={
+                  <Button variant="outline" size="touch" disabled={isPending("archive")}>
+                    <Archive aria-hidden="true" />
+                    Hide this category
+                  </Button>
                 }
-              >
-                Archive category
-              </Button>
+                title={`Hide "${selected.name}"?`}
+                consequence={
+                  <>
+                    {selected.name} and its {selected.items.length}{" "}
+                    {selected.items.length === 1 ? "item" : "items"} come off the menu customers
+                    see, straight away. Past orders keep showing what was actually bought. You
+                    cannot bring it back from this screen.
+                  </>
+                }
+                confirmLabel="Hide this category"
+                onConfirm={async () => {
+                  await run(
+                    "archive",
+                    () => api.archiveCategory(selected.id),
+                    "Could not hide the category.",
+                  );
+                  setSelectedId(null);
+                }}
+              />
             ) : null}
           </div>
 
           {!selected ? (
-            <p className="text-muted-foreground text-sm">Select a category, or create one to begin.</p>
+            <div className="border-border rounded-xl border border-dashed">
+              <EmptyState
+                icon={UtensilsCrossed}
+                title="Pick a category on the left"
+                hint="Or type a name below it to start a new one — starters, drinks, whatever the kitchen calls them."
+              />
+            </div>
           ) : (
             <>
               {selected.items.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No items in this category yet.</p>
+                <div className="border-border rounded-xl border border-dashed">
+                  <EmptyState
+                    size="sm"
+                    icon={UtensilsCrossed}
+                    title={`Nothing in ${selected.name} yet`}
+                    hint="Type a dish name below and add it, then open it to set the price and add a photo."
+                  />
+                </div>
               ) : (
                 <SortableList
                   items={selected.items}
@@ -153,7 +204,7 @@ export function MenuManager({ initialCategories }: { initialCategories: Category
                           : category,
                       ),
                     );
-                    void run(() => api.reorderItems(selected.id, ids), "Could not save the new order.");
+                    void run("items", () => api.reorderItems(selected.id, ids), "Could not save the new order.");
                   }}
                   renderItem={(item) => (
                     <div className="flex items-center gap-3">
@@ -175,22 +226,33 @@ export function MenuManager({ initialCategories }: { initialCategories: Category
                             </Badge>
                           ) : null}
                         </span>
-                        <span className="text-muted-foreground block text-xs">
-                          {formatMinor(item.basePriceMinor)}
-                          {item.imageUrl ? null : " · no photo"}
+                        <span className="text-muted-foreground flex items-center gap-2 text-sm">
+                          <Money minor={item.basePriceMinor} />
+                          {item.imageUrl ? null : (
+                            <span className="flex items-center gap-1">
+                              <ImageOff className="size-3.5" aria-hidden="true" />
+                              no photo
+                            </span>
+                          )}
                         </span>
                       </button>
 
-                      <label className="flex shrink-0 items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">
-                          {item.isAvailable ? "Available" : "Sold out"}
+                      <label className="flex shrink-0 items-center gap-2 text-sm">
+                        <span
+                          className={cn(
+                            "font-medium",
+                            item.isAvailable ? "text-muted-foreground" : "text-st-unpaid",
+                          )}
+                        >
+                          {item.isAvailable ? "On sale" : "Sold out"}
                         </span>
                         <Switch
                           checked={item.isAvailable}
-                          disabled={busy}
-                          aria-label={`${item.name} available`}
+                          disabled={isPending(`avail-${item.id}`)}
+                          aria-label={`${item.name} on sale`}
                           onCheckedChange={(checked) =>
                             void run(
+                              `avail-${item.id}`,
                               () => api.setItemAvailability(item.id, checked),
                               "Could not change availability.",
                             )
@@ -210,6 +272,7 @@ export function MenuManager({ initialCategories }: { initialCategories: Category
                   if (!name) return;
                   setNewItem("");
                   void run(
+                    "new-item",
                     () => api.createItem({ categoryId: selected.id, name, basePriceMinor: 0 }),
                     "Could not create the item.",
                   );
@@ -221,8 +284,18 @@ export function MenuManager({ initialCategories }: { initialCategories: Category
                   placeholder="New item"
                   aria-label="New item name"
                 />
-                <Button type="submit" size="icon" variant="outline" disabled={busy} aria-label="Add item">
-                  <Plus className="size-4" />
+                <Button
+                  type="submit"
+                  size="icon-touch"
+                  variant="outline"
+                  disabled={isPending("new-item")}
+                  aria-label="Add item"
+                >
+                  {isPending("new-item") ? (
+                    <Loader2 className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Plus aria-hidden="true" />
+                  )}
                 </Button>
               </form>
             </>

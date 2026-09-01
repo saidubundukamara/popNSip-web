@@ -50,11 +50,22 @@ export function TenderPanel({
   dueMinor,
   onSettled,
   onDone,
+  doneLabel = "Next order",
+  deferLabel = "They will pay later — start the next order",
 }: {
   order: StaffOrder;
   dueMinor: number;
+  /**
+   * Fires when money lands. Deliberately NOT the signal to reload whatever
+   * decides this panel is on screen: the change-due figure lives in here, and
+   * a parent that re-reads the balance the instant cash is taken unmounts the
+   * panel before the cashier has read how much to hand back. Reload on
+   * `onDone` instead.
+   */
   onSettled: () => void;
   onDone: () => void;
+  doneLabel?: string;
+  deferLabel?: string;
 }) {
   const [tendered, setTendered] = React.useState("");
   const [change, setChange] = React.useState<number | null>(null);
@@ -102,7 +113,7 @@ export function TenderPanel({
         </div>
         <Button size="touch-lg" className="w-full" onClick={onDone}>
           <Check aria-hidden="true" />
-          Next order
+          {doneLabel}
         </Button>
       </div>
     );
@@ -197,7 +208,7 @@ export function TenderPanel({
         disabled={busy !== null}
         onClick={onDone}
       >
-        They will pay later — start the next order
+        {deferLabel}
       </Button>
     </div>
   );

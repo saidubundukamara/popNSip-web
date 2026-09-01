@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Minus, Plus, Search, Trash2, UtensilsCrossed, X } from "lucide-react";
+import {
+  ChevronDown,
+  Loader2,
+  Minus,
+  Plus,
+  Search,
+  Trash2,
+  UtensilsCrossed,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -77,6 +86,7 @@ export function PosScreen({ menu }: { menu: PublicMenu }) {
   const [name, setName] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [placed, setPlaced] = React.useState<StaffOrder | null>(null);
+  const ticketRef = React.useRef<HTMLElement>(null);
 
   const currency = menu.branch.currency;
   const categories = menu.categories.filter((entry) => entry.items.length > 0);
@@ -149,7 +159,7 @@ export function PosScreen({ menu }: { menu: PublicMenu }) {
   }
 
   return (
-    <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[1fr_23rem]">
+    <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[1fr_20rem] xl:grid-cols-[1fr_23rem]">
       <section className="flex min-w-0 flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-56 flex-1">
@@ -205,7 +215,7 @@ export function PosScreen({ menu }: { menu: PublicMenu }) {
           visible.map((entry) => (
             <div key={entry.id} className="flex flex-col gap-2">
               <h2 className="text-sm font-semibold">{entry.name}</h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                 {entry.items.map((item) => (
                   <ItemTile
                     key={item.id}
@@ -220,7 +230,10 @@ export function PosScreen({ menu }: { menu: PublicMenu }) {
         )}
       </section>
 
-      <aside className="bg-card ring-foreground/10 sticky top-20 flex max-h-[calc(100dvh-6.5rem)] min-w-0 flex-col rounded-xl ring-1">
+      <aside
+        ref={ticketRef}
+        className="bg-card ring-foreground/10 flex min-w-0 flex-col rounded-xl ring-1 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6.5rem)]"
+      >
         {placed ? (
           <div className="flex flex-col gap-4 overflow-y-auto p-4">
             <h2 className="font-semibold">Take payment</h2>
@@ -394,6 +407,24 @@ export function PosScreen({ menu }: { menu: PublicMenu }) {
           </>
         )}
       </aside>
+
+      {lines.length > 0 && !placed ? (
+        <div className="fixed inset-x-0 bottom-14 z-30 px-4 pb-[env(safe-area-inset-bottom)] lg:hidden">
+          <button
+            type="button"
+            onClick={() => ticketRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="bg-brand-700 flex h-14 w-full items-center justify-between gap-3 rounded-xl px-5 text-white shadow-lg"
+          >
+            <span className="text-base font-semibold">
+              {lines.reduce((count, line) => count + line.quantity, 0)} on the ticket
+            </span>
+            <span className="flex items-center gap-2 text-lg font-bold tabular-nums">
+              {formatMinor(subtotal, currency)}
+              <ChevronDown aria-hidden="true" className="size-5" />
+            </span>
+          </button>
+        </div>
+      ) : null}
 
       {selected ? (
         <ItemSheet
