@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 
 import { MenuBrowser } from "@/components/storefront/menu-browser";
-import { API_BASE_URL } from "@/lib/api-client";
+import { API_ORIGIN } from "@/lib/api-origin";
 import type { PublicMenu } from "@/lib/menu";
 
 async function loadMenu(): Promise<PublicMenu | null> {
@@ -11,7 +11,7 @@ async function loadMenu(): Promise<PublicMenu | null> {
     // next refresh — an ISR window would hold both back. Caching still happens,
     // just at the layer that can be revalidated: the endpoint sets its own
     // Cache-Control for the browser and any CDN in front of it.
-    const response = await fetch(`${API_BASE_URL}/api/menu`, { cache: "no-store" });
+    const response = await fetch(`${API_ORIGIN}/api/menu`, { cache: "no-store" });
     if (!response.ok) return null;
     return (await response.json()) as PublicMenu;
   } catch {

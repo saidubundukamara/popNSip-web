@@ -1,7 +1,8 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 
-import { API_BASE_URL, type SessionUser } from "@/lib/api-client";
+import type { SessionUser } from "@/lib/api-client";
+import { API_ORIGIN } from "@/lib/api-origin";
 import type { AnalyticsOverview, Category, StaffOrder } from "@/lib/menu";
 
 /**
@@ -12,7 +13,7 @@ import type { AnalyticsOverview, Category, StaffOrder } from "@/lib/menu";
 async function serverApiFetch<T>(path: string): Promise<T | null> {
   const cookieHeader = (await cookies()).toString();
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${API_ORIGIN}${path}`, {
     headers: cookieHeader ? { cookie: cookieHeader } : {},
     // Session state must never be served from a cache.
     cache: "no-store",

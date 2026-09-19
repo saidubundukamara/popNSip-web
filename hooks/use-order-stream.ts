@@ -63,7 +63,7 @@ export function useOrderStream(onChange: () => void): { mode: StreamMode; lastEv
       if (disposed) return;
 
       source?.close();
-      source = new EventSource(`${API_BASE_URL}/api/staff/orders/stream`, { withCredentials: true });
+      source = new EventSource(`${API_BASE_URL}/api/staff/orders/stream`);
 
       source.onopen = () => {
         if (disposed) return;

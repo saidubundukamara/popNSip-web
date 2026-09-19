@@ -1,12 +1,13 @@
 /**
  * Browser-side API client.
  *
- * `credentials: 'include'` is what carries the staff session cookie to the
- * Express origin; without it every dashboard request is anonymous. The server
- * sets CORS with an explicit origin and `credentials: true` to match.
+ * Paths are relative: the browser only ever talks to its own origin, and the
+ * `/api/*` rewrite in `next.config.ts` forwards to Express. The staff session
+ * cookie is therefore first-party on the web domain. Server-side code cannot
+ * use a relative URL; it uses `API_ORIGIN` from `lib/api-origin.ts`.
  */
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+export const API_BASE_URL = "";
 
 export type ApiIssue = { path: string; message: string };
 

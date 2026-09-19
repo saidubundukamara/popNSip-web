@@ -1,14 +1,14 @@
 import { PageHeader } from "@/components/dashboard/shared/page-header";
 import { EmptyState } from "@/components/dashboard/shared/empty-state";
 import { PosScreen } from "@/components/dashboard/pos/pos-screen";
-import { API_BASE_URL } from "@/lib/api-client";
+import { API_ORIGIN } from "@/lib/api-origin";
 import type { PublicMenu } from "@/lib/menu";
 import { WifiOff } from "lucide-react";
 
 export const metadata = { title: "POS" };
 
 export default async function PosPage() {
-  const response = await fetch(`${API_BASE_URL}/api/menu`, { cache: "no-store" });
+  const response = await fetch(`${API_ORIGIN}/api/menu`, { cache: "no-store" });
   const menu = response.ok ? ((await response.json()) as PublicMenu) : null;
 
   if (!menu) {

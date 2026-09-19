@@ -1,12 +1,12 @@
 import { CheckoutForm } from "@/components/storefront/checkout-form";
-import { API_BASE_URL } from "@/lib/api-client";
+import { API_ORIGIN } from "@/lib/api-origin";
 import type { PublicSettings } from "@/lib/menu";
 
 export const metadata = { title: "Checkout" };
 
 async function loadSettings(): Promise<PublicSettings | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/settings/public`, { cache: "no-store" });
+    const response = await fetch(`${API_ORIGIN}/api/settings/public`, { cache: "no-store" });
     if (!response.ok) return null;
     return (await response.json()) as PublicSettings;
   } catch {
